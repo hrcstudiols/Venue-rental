@@ -12,21 +12,29 @@ enum BookingStatus {
   AWAITING_PAYMENT
   CONFIRMED
   REJECTED
+  CANCELLED
 }
 
 model Booking {
-  id                String        @id @default(cuid())
-  customerName      String
-  email             String
-  phone             String
-  startAt           DateTime
-  endAt             DateTime
-  note               String        @default("")
-  status             BookingStatus @default(PENDING_REVIEW)
-  calendarEventId    String?
-  paymentReportedAt  DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  id                    String        @id @default(cuid())
+  customerName          String
+  email                 String
+  phone                 String
+  room                  String        @default("A")
+  startAt               DateTime
+  endAt                 DateTime
+  note                  String        @default("")
+  requestedHrcTeacher   Boolean       @default(false)
+  hrcTeacherApproved    Boolean       @default(false)
+  totalPrice            Int           @default(0)
+  paymentDueAt          DateTime?
+  paymentReportedAt     DateTime?
+  cancellationRequestedAt DateTime?
+  refundAmount          Int?
+  status                BookingStatus @default(PENDING_REVIEW)
+  calendarEventId       String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
-  @@index([startAt, endAt, status])
+  @@index([room, startAt, endAt, status])
 }

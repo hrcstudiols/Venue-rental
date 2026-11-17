@@ -1,0 +1,10 @@
+ALTER TYPE "BookingStatus" ADD VALUE 'CANCELLED';
+ALTER TABLE "Booking" ADD COLUMN "room" TEXT NOT NULL DEFAULT 'A';
+ALTER TABLE "Booking" ADD COLUMN "requestedHrcTeacher" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Booking" ADD COLUMN "hrcTeacherApproved" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Booking" ADD COLUMN "totalPrice" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "Booking" ADD COLUMN "paymentDueAt" TIMESTAMP(3);
+ALTER TABLE "Booking" ADD COLUMN "cancellationRequestedAt" TIMESTAMP(3);
+ALTER TABLE "Booking" ADD COLUMN "refundAmount" INTEGER;
+DROP INDEX "Booking_startAt_endAt_status_idx";
+CREATE INDEX "Booking_room_startAt_endAt_status_idx" ON "Booking"("room", "startAt", "endAt", "status");
