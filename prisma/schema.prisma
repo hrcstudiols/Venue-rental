@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum BookingStatus {
+  PENDING_REVIEW
+  AWAITING_PAYMENT
+  CONFIRMED
+  REJECTED
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  customerName String
+  email       String
+  phone       String
+  startAt     DateTime
+  endAt       DateTime
+  note        String        @default("")
+  status      BookingStatus @default(PENDING_REVIEW)
+  calendarEventId String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([startAt, endAt, status])
+}
