@@ -1,16 +1,17 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Slot = { start: string; end: string; available: boolean };
 const todayTaipei = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 
 export default function Home() {
+  const router = useRouter();
   const [date, setDate] = useState(todayTaipei);
   const [slots, setSlots] = useState<Slot[]>([]);
   const [startHour, setStartHour] = useState<number | null>(null);
   const [duration, setDuration] = useState(1);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -27,17 +28,16 @@ export default function Home() {
 
   const durationOptions = useMemo(() => {
     if (startHour === null) return [1];
-    const max = Math.min(13, 24 - startHour);
     let count = 0;
     for (let hour = startHour; hour < 24; hour++) {
       if (!slots.find((slot) => Number(slot.start.slice(0, 2)) === hour)?.available) break;
       count++;
     }
-    return Array.from({ length: Math.min(max, count) }, (_, index) => index + 1);
+    return Array.from({ length: Math.min(13, 24 - startHour, count) }, (_, index) => index + 1);
   }, [startHour, slots]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setError(""); setMessage("");
+    event.preventDefault(); setError("");
     if (startHour === null) { setError("請先選擇開始時段"); return; }
     setLoading(true);
     const form = new FormData(event.currentTarget);
@@ -45,12 +45,11 @@ export default function Home() {
       const response = await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, startHour, duration, customerName: form.get("customerName"), email: form.get("email"), phone: form.get("phone"), note: form.get("note") }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "送出失敗");
-      setMessage(data.message); event.currentTarget.reset(); await loadSlots(date);
+      router.push(`/booking/${data.booking.id}`);
     } catch (e) { setError(e instanceof Error ? e.message : "送出失敗"); }
     finally { setLoading(false); }
   }
 
-  const endHour = startHour === null ? null : startHour + duration;
   return <main className="wrap">
     <header><span className="eyebrow">VENUE RENTAL</span><h1>場地租借</h1><p>選擇日期與時段，送出預約申請。</p></header>
     <section className="card">
@@ -65,10 +64,10 @@ export default function Home() {
       <form onSubmit={submit}>
         <div className="fields"><label className="field">姓名<input name="customerName" required maxLength={100} /></label><label className="field">Email<input name="email" type="email" required maxLength={254} /></label><label className="field">聯絡電話<input name="phone" required maxLength={40} /></label><label className="field full">備註（選填）<textarea name="note" rows={3} maxLength={1000} /></label></div>
         <p className="hint">送出後由場地方確認；確認後請依通知匯款。款項經人工確認後，預約才正式成立。</p>
-        {error && <p className="alert error">{error}</p>}{message && <p className="alert success">{message}</p>}
+        {error && <p className="alert error">{error}</p>}
         <button className="submit" type="submit" disabled={loading || startHour === null}>{loading ? "送出中…" : "送出預約申請"}</button>
       </form>
     </section>
-    <footer>預約狀態以場地方通知為準。</footer>
+    <footer>預約狀態以場地方通知為準。<a href="/admin">管理者</a></footer>
   </main>;
 }

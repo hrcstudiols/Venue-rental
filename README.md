@@ -1,47 +1,44 @@
 # 場地租借網站
 
-Next.js App Router starter for Taipei-time bookings. Guests can see hourly availability (11:00–24:00) and submit a request. The operator reviews it, asks the guest to transfer, and manually confirms receipt; only then does the booking become confirmed and get added to Google Calendar.
+Next.js App Router booking site with Taipei-time availability (daily 11:00–24:00, one-hour increments). Customers submit a request; the operator approves it, the customer transfers to the bank account below, and the operator manually confirms receipt. Only then is the booking confirmed and added to Google Calendar.
 
-## Run locally
+## Local development
 
-1. Install Node.js 20.9 or later.
-2. Copy `.env.example` to `.env` and set `ADMIN_TOKEN` to a long random secret.
-3. Install dependencies and initialize the local database:
+Requirements: Node.js 20.9+, npm, and a PostgreSQL database (local or hosted).
+
+1. Copy `.env.example` to `.env` and set `DATABASE_URL` to your PostgreSQL connection string and `ADMIN_TOKEN` to a long, random secret.
+2. Install and start the application:
 
    ```bash
    npm install
-   npx prisma db push
+   npx prisma migrate deploy
    npm run dev
    ```
 
-4. Open http://localhost:3000.
+3. Open http://localhost:3000. The customer booking page is `/`; the operator page is `/admin`.
 
-The local database uses SQLite. For deployment, use a persistent database supported by Prisma and update `DATABASE_URL`/the Prisma datasource accordingly; do not use ephemeral server storage.
+## Operator flow
+
+1. Sign in at `/admin` using the `ADMIN_TOKEN` value.
+2. Review requests and approve or reject them. Approval changes the state to awaiting payment.
+3. Send the bank details to the customer (displayed on their private booking status page): **玉山銀行（808）／帳號 0875979137790**.
+4. The customer can report that the transfer was made. This is only a notification; it does not verify payment.
+5. Check the actual bank transaction, then use **確認入帳** in `/admin`. The booking is confirmed and the calendar event is created if Google Calendar is configured.
+
+Customer status links use the booking's unguessable ID and show no personal details. Do not share the link publicly. There is no automatic payment verification or payment gateway.
 
 ## Google Calendar
 
-Create a Google Cloud service account, enable the Google Calendar API, then share the booking calendar with `GOOGLE_SERVICE_ACCOUNT_EMAIL` as an editor. Set `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` and `GOOGLE_CALENDAR_ID` in the deployment environment. Store the key only in secret environment variables; never commit it. The code queries calendar busy periods when generating availability and inserts an event only after the operator confirms payment. If Google credentials are not configured, calendar busy periods cannot be read and confirmed bookings will not sync; configure credentials before accepting real reservations.
+Create a Google Cloud service account, enable the Google Calendar API, then share the booking calendar with `GOOGLE_SERVICE_ACCOUNT_EMAIL` as an editor. Set `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` and `GOOGLE_CALENDAR_ID` in the deployment environment. Keep the private key in secret environment variables; never commit it. The app reads calendar busy periods for availability and creates an event only after payment is manually confirmed. Without Google credentials, calendar busy periods are not included and confirmed bookings do not sync.
 
-The existing personal agenda URL is not sufficient for API access. The calendar must be shared with the service account, or the integration must be changed to an OAuth flow.
+The personal agenda URL alone is not API access. Share the target calendar with the service account, or implement an OAuth flow.
 
-## Operator workflow
+## Deploy to Vercel
 
-The API is protected by `ADMIN_TOKEN`. Use the booking ID returned to the customer-facing request (in production, add private operator authentication and notifications before operating this manually).
+1. Create a managed PostgreSQL database (for example, Neon or another provider) and copy its pooled/runtime connection string into Vercel as `DATABASE_URL`. Make sure the provider's string includes the required SSL options.
+2. Import this repository into Vercel. `vercel.json` selects the Next.js framework, build command, and Hong Kong region (`hkg1`).
+3. Add `ADMIN_TOKEN` as a Vercel environment variable for Production (and Preview only if you intend to use the admin there). Use a long random value; treat it as the admin password.
+4. Add the three Google Calendar variables if calendar integration is ready. Keep secrets in Vercel Environment Variables.
+5. Deploy. The build runs `prisma generate`, applies committed migrations with `prisma migrate deploy`, and builds Next.js. The production database must be reachable during the build.
 
-Approve a request (moves it to `AWAITING_PAYMENT`):
-
-```bash
-curl -X PATCH http://localhost:3000/api/admin/bookings/BOOKING_ID \
-  -H 'Authorization: Bearer YOUR_ADMIN_TOKEN' -H 'Content-Type: application/json' \
-  -d '{"action":"approve"}'
-```
-
-After verifying the bank transfer manually, confirm payment (moves it to `CONFIRMED` and adds the event to Google Calendar):
-
-```bash
-curl -X PATCH http://localhost:3000/api/admin/bookings/BOOKING_ID \
-  -H 'Authorization: Bearer YOUR_ADMIN_TOKEN' -H 'Content-Type: application/json' \
-  -d '{"action":"confirm-payment"}'
-```
-
-Reject a request or release an unpaid slot with `{"action":"reject"}`. Non-rejected requests reserve their timeslot while awaiting review/payment. No payment gateway is connected.
+SQLite is intentionally not used for deployment because Vercel's serverless filesystem is ephemeral. Do not set `DATABASE_URL` to a local file path in Vercel. If your Vercel database provider requires a separate direct connection for migrations, use its direct URL for `DATABASE_URL` during builds or add Prisma's `directUrl` configuration.

@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
+import { isAdminRequest } from "@/lib/admin-auth";
 import { createCalendarEvent } from "@/lib/google-calendar";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
-
 type Context = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: Request, context: Context) {
-  const expected = process.env.ADMIN_TOKEN;
-  if (!expected || request.headers.get("authorization") !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "未授權" }, { status: 401 });
-  }
+  if (!isAdminRequest(request)) return NextResponse.json({ error: "未授權" }, { status: 401 });
   const { id } = await context.params;
   try {
     const { action } = await request.json();
